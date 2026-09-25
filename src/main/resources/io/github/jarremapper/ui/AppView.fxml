@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!--
+  Main view for the JarRemapper JavaFX UI.
+  Layout:
+    - top bar:     threshold slider | decompiler combo | run button | cancel button
+    - center row:  three drop zones side-by-side
+    - progress bar (under the drop zone row)
+    - center:      table of match results
+    - bottom:      log area (collapsible via toolbar)
+  -->
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<?import javafx.scene.text.Text?>
+<?import java.lang.Double?>
+
+<VBox xmlns="http://javafx.com/javafx/21"
+      xmlns:fx="http://javafx.com/fxml/1"
+      fx:controller="io.github.jarremapper.ui.AppController"
+      styleClass="root-pane" spacing="10">
+
+  <!-- ===== Top toolbar ===== -->
+  <HBox styleClass="toolbar" spacing="14">
+    <padding><Insets top="10" right="14" bottom="10" left="14"/></padding>
+    <Label text="Threshold:" styleClass="tool-label"/>
+    <Slider fx:id="thresholdSlider" min="0" max="100" value="70" majorTickUnit="10"
+            minorTickCount="2" showTickMarks="true" showTickLabels="true"
+            prefWidth="240" snapToPixel="true"/>
+    <Label fx:id="thresholdLabel" text="70%" styleClass="tool-value" prefWidth="60"/>
+
+    <Separator orientation="VERTICAL"/>
+
+    <Label text="Decompiler:" styleClass="tool-label"/>
+    <ComboBox fx:id="decompilerCombo" prefWidth="160"/>
+
+    <Separator orientation="VERTICAL"/>
+
+    <Button fx:id="runButton" text="Run" styleClass="primary-button" onAction="#onRun"
+            prefWidth="100"/>
+    <Button fx:id="cancelButton" text="Cancel" styleClass="secondary-button" disable="true"
+            onAction="#onCancel" prefWidth="100"/>
+    <Button fx:id="openOutputButton" text="Open output" onAction="#onOpenOutput"
+            styleClass="secondary-button" prefWidth="120"/>
+  </HBox>
+
+  <!-- ===== Drop zone row ===== -->
+  <HBox styleClass="drop-zone-row" spacing="14" HBox.hgrow="ALWAYS">
+    <padding><Insets top="0" right="14" bottom="0" left="14"/></padding>
+
+    <!-- Drop zone #1: Target JAR -->
+    <VBox fx:id="targetJarZone" styleClass="drop-zone" onMouseClicked="#onClickTargetJar"
+          HBox.hgrow="ALWAYS" spacing="4">
+      <Label text="1. Target JAR (already mapped)" styleClass="drop-zone-title"/>
+      <Label fx:id="targetJarLabel" text="Drop .jar here or click to browse"
+             styleClass="drop-zone-path" wrapText="true"/>
+    </VBox>
+
+    <!-- Drop zone #2: Mapping file -->
+    <VBox fx:id="mappingFileZone" styleClass="drop-zone" onMouseClicked="#onClickMappingFile"
+          HBox.hgrow="ALWAYS" spacing="4">
+      <Label text="2. Existing mapping file" styleClass="drop-zone-title"/>
+      <Label fx:id="mappingFileLabel" text="Drop .tiny/.srg/.tsrg/.proguard here"
+             styleClass="drop-zone-path" wrapText="true"/>
+    </VBox>
+
+    <!-- Drop zone #3: Unmapped JAR -->
+    <VBox fx:id="unmappedJarZone" styleClass="drop-zone" onMouseClicked="#onClickUnmappedJar"
+          HBox.hgrow="ALWAYS" spacing="4">
+      <Label text="3. Unmapped JAR" styleClass="drop-zone-title"/>
+      <Label fx:id="unmappedJarLabel" text="Drop .jar here (no mapping required)"
+             styleClass="drop-zone-path" wrapText="true"/>
+    </VBox>
+  </HBox>
+
+  <!-- ===== Progress bar ===== -->
+  <HBox styleClass="progress-row" spacing="14">
+    <padding><Insets top="0" right="14" bottom="0" left="14"/></padding>
+    <ProgressBar fx:id="progressBar" prefWidth="320" prefHeight="20" progress="0.0"/>
+    <Label fx:id="progressLabel" text="Idle" styleClass="progress-label" HBox.hgrow="ALWAYS"/>
+  </HBox>
+
+  <!-- ===== Match results table ===== -->
+  <VBox styleClass="results-pane" VBox.vgrow="ALWAYS" spacing="6">
+    <padding><Insets top="0" right="14" bottom="0" left="14"/></padding>
+    <Label text="Match results" styleClass="section-title"/>
+    <TableView fx:id="resultsTable" VBox.vgrow="ALWAYS">
+      <columns>
+        <TableColumn fx:id="colUnmapped" text="Unmapped class" prefWidth="280"/>
+        <TableColumn fx:id="colTarget"    text="Target class"   prefWidth="280"/>
+        <TableColumn fx:id="colScore"     text="Score"           prefWidth="80"/>
+        <TableColumn fx:id="colMethods"   text="Methods"        prefWidth="120"/>
+        <TableColumn fx:id="colFields"    text="Fields"         prefWidth="120"/>
+        <TableColumn fx:id="colStatus"    text="Status"         prefWidth="120"/>
+      </columns>
+      <placeholder>
+        <Label text="Drop files above and press Run."/>
+      </placeholder>
+    </TableView>
+  </VBox>
+
+  <!-- ===== Log area ===== -->
+  <VBox styleClass="log-pane" spacing="4" prefHeight="160" VBox.vgrow="NEVER">
+    <padding><Insets top="0" right="14" bottom="14" left="14"/></padding>
+    <Label text="Log" styleClass="section-title"/>
+    <TextArea fx:id="logArea" editable="false" styleClass="log-area" wrapText="true"
+              VBox.vgrow="ALWAYS"/>
+  </VBox>
+</VBox>

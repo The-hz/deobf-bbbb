@@ -1,0 +1,26 @@
+# Gradle build outputs
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.settings/
+.project
+.classpath
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Output directory created by the application at runtime
+output/
+
+# Pre-built distribution is committed (intentional for the release)
+# but exclude re-runs of gradle build

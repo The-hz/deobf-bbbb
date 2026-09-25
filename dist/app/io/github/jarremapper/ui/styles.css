@@ -1,0 +1,208 @@
+/*
+ * JarRemapper — Modena-overridden, modern flat styling.
+ * Palette: dark slate primary, amber accent.
+ */
+
+.root-pane {
+    -fx-background-color: #1b1d22;
+    -fx-padding: 14;
+}
+
+/* ===== Toolbar ===== */
+.toolbar {
+    -fx-background-color: #252830;
+    -fx-background-radius: 8;
+    -fx-border-color: #353a44;
+    -fx-border-radius: 8;
+    -fx-border-width: 1;
+}
+
+.tool-label {
+    -fx-text-fill: #c8ccd2;
+    -fx-font-weight: bold;
+}
+
+.tool-value {
+    -fx-text-fill: #f5b948;
+    -fx-font-weight: bold;
+    -fx-font-size: 14px;
+}
+
+.primary-button {
+    -fx-background-color: #4f7cff;
+    -fx-text-fill: white;
+    -fx-background-radius: 6;
+    -fx-font-weight: bold;
+    -fx-cursor: hand;
+}
+.primary-button:hover { -fx-background-color: #5d8bff; }
+.primary-button:pressed { -fx-background-color: #4060e8; }
+.primary-button:disabled {
+    -fx-background-color: #2a2f3a;
+    -fx-text-fill: #7a7e88;
+    -fx-cursor: default;
+}
+
+.secondary-button {
+    -fx-background-color: #353a44;
+    -fx-text-fill: #e5e8ed;
+    -fx-background-radius: 6;
+    -fx-cursor: hand;
+}
+.secondary-button:hover { -fx-background-color: #404553; }
+.secondary-button:pressed { -fx-background-color: #2c3038; }
+
+/* ===== Drop zones ===== */
+.drop-zone-row {
+    -fx-background-color: transparent;
+}
+
+.drop-zone {
+    -fx-background-color: #202329;
+    -fx-background-radius: 10;
+    -fx-border-color: #3a3f4a;
+    -fx-border-color-dragged: #f5b948;
+    -fx-border-radius: 10;
+    -fx-border-width: 2;
+    -fx-border-style: dashed inside;
+    -fx-padding: 16;
+    -fx-cursor: hand;
+    -fx-alignment: center;
+    -fx-spacing: 4;
+    -fx-pref-height: 110;
+}
+
+.drop-zone:hover {
+    -fx-background-color: #262a32;
+    -fx-border-color: #5a6172;
+}
+
+.drop-zone.drag-over {
+    -fx-background-color: #2c3140;
+    -fx-border-color: #f5b948;
+    -fx-border-style: solid inside;
+}
+
+.drop-zone-title {
+    -fx-text-fill: #f0f1f5;
+    -fx-font-size: 13px;
+    -fx-font-weight: bold;
+}
+
+.drop-zone-path {
+    -fx-text-fill: #a0a4ae;
+    -fx-font-size: 11px;
+}
+
+/* ===== Progress ===== */
+.progress-row {
+    -fx-background-color: transparent;
+}
+.progress-bar {
+    -fx-accent: #f5b948;
+}
+.progress-label {
+    -fx-text-fill: #c8ccd2;
+    -fx-font-size: 12px;
+}
+
+/* ===== Results table ===== */
+.results-pane {
+    -fx-background-color: transparent;
+}
+
+.section-title {
+    -fx-text-fill: #f0f1f5;
+    -fx-font-size: 14px;
+    -fx-font-weight: bold;
+    -fx-padding: 4 0 4 0;
+}
+
+.table-view {
+    -fx-background-color: #1d2026;
+    -fx-background-radius: 8;
+    -fx-border-color: #353a44;
+    -fx-border-radius: 8;
+    -fx-border-width: 1;
+}
+.table-view .column-header-background {
+    -fx-background-color: #2a2e36;
+    -fx-background-radius: 8 8 0 0;
+}
+.table-view .column-header .label {
+    -fx-text-fill: #e5e8ed;
+    -fx-font-weight: bold;
+}
+.table-row-cell {
+    -fx-background-color: #1d2026;
+    -fx-text-fill: #d8dce2;
+}
+.table-row-cell:odd {
+    -fx-background-color: #202329;
+}
+.table-row-cell:selected {
+    -fx-background-color: #2c3140;
+    -fx-text-fill: white;
+}
+.table-cell {
+    -fx-text-fill: #d8dce2;
+}
+.table-row-cell:selected .table-cell {
+    -fx-text-fill: white;
+}
+
+/* Status cell colored badges */
+.status-matched   { -fx-text-fill: #66d27a; -fx-font-weight: bold; }
+.status-unmatched { -fx-text-fill: #f0a050; -fx-font-weight: bold; }
+.status-identity { -fx-text-fill: #7a8a99; -fx-font-weight: bold; }
+
+/* ===== Log pane ===== */
+.log-pane {
+    -fx-background-color: transparent;
+}
+.log-area {
+    -fx-control-inner-background: #161820;
+    -fx-background-color: #161820;
+    -fx-text-fill: #c8ccd2;
+    -fx-font-family: 'DejaVu Sans Mono', 'Menlo', monospace;
+    -fx-font-size: 12px;
+    -fx-background-radius: 8;
+    -fx-border-color: #353a44;
+    -fx-border-radius: 8;
+    -fx-border-width: 1;
+}
+.log-area .content {
+    -fx-background-color: #161820;
+}
+
+/* ===== Scrollbars ===== */
+.scroll-bar .thumb {
+    -fx-background-color: #3a3f4a;
+    -fx-background-radius: 8;
+}
+.scroll-bar .increment-button,
+.scroll-bar .decrement-button {
+    -fx-background-color: transparent;
+    -fx-text-fill: #a0a4ae;
+}
+.scroll-bar .increment-arrow,
+.scroll-bar .decrement-arrow {
+    -fx-shape: "M0,0 L4,4 L0,8 Z";
+    -fx-background-color: #a0a4ae;
+}
+
+/* ===== Dialog (decompiled review) ===== */
+.dialog-pane {
+    -fx-background-color: #1d2026;
+}
+.dialog-pane .label {
+    -fx-text-fill: #e5e8ed;
+}
+.dialog-pane .button {
+    -fx-background-color: #353a44;
+    -fx-text-fill: #e5e8ed;
+    -fx-background-radius: 6;
+}
+.dialog-pane .button:hover {
+    -fx-background-color: #404553;
+}

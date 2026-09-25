@@ -1,0 +1,86 @@
+plugins {
+    id 'java'
+    id 'application'
+    id 'org.openjfx.javafxplugin' version '0.1.0'
+}
+
+group = 'io.github.jarremapper'
+version = '1.0.0'
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
+repositories {
+    mavenCentral()
+    maven { url = 'https://jitpack.io' }
+}
+
+javafx {
+    version = '21.0.2'
+    modules = ['javafx.controls', 'javafx.fxml', 'javafx.graphics']
+}
+
+ext {
+    asmVersion = '9.7'
+}
+
+dependencies {
+    // ASM —— bytecode parsing + remapping
+    implementation "org.ow2.asm:asm:${asmVersion}"
+    implementation "org.ow2.asm:asm-tree:${asmVersion}"
+    implementation "org.ow2.asm:asm-commons:${asmVersion}"
+
+    // Decompilers (Maven Central artifacts).
+    // These are runtime-only — our adapters do NOT compile against the
+    // decompiler classes (they spawn a child JVM and invoke main(String[])
+    // via the jar's manifest main class). So they're declared as
+    // `runtimeOnly` and only one needs to be present at runtime for the
+    // matching combo box entry to enable.
+    runtimeOnly      'org.benf:cfr:0.152'                       // CFR
+    runtimeOnly      'org.vineflower:vineflower:1.10.1'         // Vineflower (fork of Fernflower)
+    runtimeOnly      'org.quiltmc:quiltflower:1.9.0'            // Quiltflower (older Fernflower fork, on Maven Central)
+
+    // Logging
+    implementation 'org.slf4j:slf4j-api:2.0.13'
+    runtimeOnly    'ch.qos.logback:logback-classic:1.5.6'
+
+    // Optional: if you want the JetBrains Fernflower artifact (newer than
+    // Quiltflower), it is NOT on Maven Central. Download it from
+    // https://github.com/JetBrains/intellij-community/raw/master/plugins/java-decompiler/engine/fernflower.jar
+    // (or build it from source) and drop the jar into ./lib/ — the
+    // `fernflower` jar-finder will pick it up from there at runtime.
+    //
+    // runtimeOnly      fileTree(dir: 'lib', include: ['fernflower*.jar'])
+
+    // Tests
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.10.2'
+    testRuntimeOnly    'org.junit.platform:junit-platform-launcher:1.10.2'
+}
+
+application {
+    mainClass = 'io.github.jarremapper.Main'
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+}
+
+tasks.named('run') {
+    // Allow GUI + stdin interaction
+    standardInput = System.in
+    if (System.getProperty('os.name').toLowerCase().contains('linux')) {
+        // Some Linux envs need this for JavaFX to attach to a display
+        environment('DISPLAY', System.getenv('DISPLAY') ?: ':0')
+    }
+}
+
+// Convenience launcher using javafx:run equivalent
+tasks.register('guiRun', JavaExec) {
+    group = 'application'
+    description = 'Launch the JarRemapper JavaFX GUI'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass.set('io.github.jarremapper.Main')
+}
