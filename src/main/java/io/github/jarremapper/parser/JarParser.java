@@ -108,6 +108,7 @@ public class JarParser {
                                 BytecodeStructureHash.analyze(this);
                         MemberKey key = new MemberKey(name, descriptor);
                         info.addMethod(new MethodInfo(key, access, fp.hash(),
+                                fp.coarseHash(),
                                 fp.maxStack(), fp.maxLocals(), fp.insnCount()));
                     }
                 };

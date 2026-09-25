@@ -99,8 +99,14 @@ public class RemapPipeline {
 
         List<ClassInfo> unmatched = new ArrayList<>();
         int matchedCount = 0;
+        int totalUnmapped = unmappedParsed.size();
+        int idx = 0;
         for (ClassInfo u : unmappedParsed.values()) {
             if (callback.isCancelled()) throw new InterruptedException("User cancelled.");
+            idx++;
+            // P1-10: per-class progress on Stage 3 (matching).
+            progress(0.25 + 0.20 * (idx / (double) Math.max(1, totalUnmapped)),
+                     "Matching " + idx + "/" + totalUnmapped + ": " + u.internalName());
             var best = matcher.matchBest(u, targets, threshold);
             if (best.isPresent()) {
                 MatchResult r = best.get();
@@ -147,7 +153,7 @@ public class RemapPipeline {
         progress(0.85, "Decompiling remapped JAR");
         Path sourcesDir = outputDir.resolve("sources");
         Files.createDirectories(sourcesDir);
-        Decompiler dec = DecompilerRegistry.get(decompilerName);
+        Decompiler dec = DecompilerRegistry.get(decompilerName, config.decompilerTimeoutMinutes());
         dec.decompile(remappedJar, sourcesDir, new HashMap<>());
         log("Decompiled remapped JAR → " + sourcesDir);
 
@@ -215,13 +221,8 @@ public class RemapPipeline {
             methodFpToOrig.put(fpKey, orig);
         }
 
-        // Field-level: key by descriptor (field names unreliable after obf).
-        Map<String, String> fieldDescToOrig = new HashMap<>();
-        for (Map.Entry<MemberKey, String> e : tEntry.fields().entrySet()) {
-            fieldDescToOrig.merge(e.getKey().descriptor(), e.getValue(),
-                    (a, b) -> a);  // first wins
-        }
-
+        // Apply method matching: for each unmapped method, look up by
+        // (desc, fingerprint) and write the orig name (or fall back to identity).
         for (Map.Entry<MemberKey, MethodInfo> me : unmapped.methods().entrySet()) {
             MemberKey mk = me.getKey();
             String fpKey = mk.descriptor() + "#" +
@@ -235,12 +236,94 @@ public class RemapPipeline {
                     mk.name(), mk.descriptor(), orig);
         }
 
+        // Field-level matching (P0-1 fix): instead of collapsing to a single
+        // orig-name per descriptor ("first wins"), build a per-descriptor
+        // FIFO queue of (origName, access, initFp) candidates and pop one
+        // per unmapped field in declaration order. This correctly handles
+        // classes with multiple fields of the same type (e.g. two int fields
+        // "a" and "b" both with descriptor "I" — they would otherwise both
+        // map to the same orig name).
+        //
+        // Disambiguation priority per unmapped field:
+        //   1. exact (desc, access, initFp) match — strong signal
+        //   2. (desc, access) match — access flags survived obfuscation
+        //   3. FIFO by descriptor only — assumes both classes visited fields
+        //      in the same source-level declaration order (true for most
+        //      obfuscators that don't shuffle field order)
+        java.util.Map<String, java.util.Deque<FieldCandidate>> fieldCandidatesByDesc =
+                new java.util.HashMap<>();
+        for (Map.Entry<MemberKey, String> e : tEntry.fields().entrySet()) {
+            String desc = e.getKey().descriptor();
+            fieldCandidatesByDesc.computeIfAbsent(desc, k -> new java.util.ArrayDeque<>())
+                    .add(new FieldCandidate(e.getValue(),
+                            // access/initFp for the target field — pulled
+                            // from the target's parsed ClassInfo if present
+                            lookupFieldAccess(tInfo, e.getKey()),
+                            lookupFieldInitFp(tInfo, e.getKey())));
+        }
+
         for (MemberKey mk : unmapped.fields().keySet()) {
-            String orig = fieldDescToOrig.get(mk.descriptor());
+            java.util.Deque<FieldCandidate> q =
+                    fieldCandidatesByDesc.get(mk.descriptor());
+            String orig = null;
+            if (q != null && !q.isEmpty()) {
+                // Try (desc, access, initFp) match first.
+                FieldCandidate best = null;
+                for (FieldCandidate c : q) {
+                    int uAccess = lookupUnmappedFieldAccess(unmapped, mk);
+                    int uInitFp = lookupUnmappedFieldInitFp(unmapped, mk);
+                    if (c.access == uAccess && c.initFp == uInitFp
+                            && uAccess != 0 /* 0 means unknown */) {
+                        best = c; break;
+                    }
+                }
+                // Fall back to (desc, access) match.
+                if (best == null) {
+                    int uAccess = lookupUnmappedFieldAccess(unmapped, mk);
+                    for (FieldCandidate c : q) {
+                        if (c.access != 0 && c.access == uAccess) {
+                            best = c; break;
+                        }
+                    }
+                }
+                // Last resort: head of queue (declaration order).
+                if (best == null) best = q.peek();
+                q.remove(best);
+                orig = best.origName;
+            }
             if (orig == null) orig = mk.name();
             outMapping.putField(r.unmappedObfName(), r.targetOrigName(),
                     mk.name(), mk.descriptor(), orig);
         }
+    }
+
+    /** Tiny struct used by field disambiguation. */
+    private record FieldCandidate(String origName, int access, int initFp) {}
+
+    /** Look up a target field's access flags from the parsed ClassInfo. */
+    private static int lookupFieldAccess(ClassInfo tInfo, MemberKey key) {
+        if (tInfo == null) return 0;
+        io.github.jarremapper.model.FieldInfo fi = tInfo.fields().get(key);
+        return fi == null ? 0 : fi.access();
+    }
+
+    /** Look up a target field's init fingerprint from the parsed ClassInfo. */
+    private static int lookupFieldInitFp(ClassInfo tInfo, MemberKey key) {
+        if (tInfo == null) return 0;
+        io.github.jarremapper.model.FieldInfo fi = tInfo.fields().get(key);
+        return fi == null ? 0 : fi.initFingerprint();
+    }
+
+    /** Look up the unmapped field's access flags (we have its ClassInfo). */
+    private static int lookupUnmappedFieldAccess(ClassInfo unmapped, MemberKey key) {
+        io.github.jarremapper.model.FieldInfo fi = unmapped.fields().get(key);
+        return fi == null ? 0 : fi.access();
+    }
+
+    /** Look up the unmapped field's init fingerprint. */
+    private static int lookupUnmappedFieldInitFp(ClassInfo unmapped, MemberKey key) {
+        io.github.jarremapper.model.FieldInfo fi = unmapped.fields().get(key);
+        return fi == null ? 0 : fi.initFingerprint();
     }
 
     /**
@@ -271,7 +354,7 @@ public class RemapPipeline {
             }
 
             Path decompDir = Files.createTempDirectory("jr-decomp-");
-            Decompiler dec = DecompilerRegistry.get(decompilerName);
+            Decompiler dec = DecompilerRegistry.get(decompilerName, config.decompilerTimeoutMinutes());
             try {
                 dec.decompile(tempJar, decompDir, new HashMap<>());
             } catch (Exception ex) {

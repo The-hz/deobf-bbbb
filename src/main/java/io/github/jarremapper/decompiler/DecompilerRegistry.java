@@ -25,16 +25,21 @@ public final class DecompilerRegistry {
 
     /** Build a fresh adapter for the named decompiler, locating its jar lazily. */
     public static Decompiler get(String name) {
+        return get(name, 15);
+    }
+
+    /** Build a fresh adapter with a custom child-JVM timeout in minutes (P1-12). */
+    public static Decompiler get(String name, long timeoutMinutes) {
         try {
             return switch (name) {
-                case "CFR"         -> new CfrAdapter(DecompilerLocator.locate("cfr"));
+                case "CFR"         -> new CfrAdapter(DecompilerLocator.locate("cfr"), timeoutMinutes);
                 // Fernflower is published as 'org.quiltmc:quiltflower' on Maven
                 // Central (an older fork of Fernflower, still maintained). Users
                 // can also drop a JetBrains 'fernflower.jar' into ./lib/ — both
                 // share the main class name we invoke. Try fernflower first,
                 // fall back to quiltflower.
-                case "Fernflower" -> new FernflowerAdapter(locateFernflowerLike());
-                case "Vineflower" -> new VineflowerAdapter(DecompilerLocator.locate("vineflower"));
+                case "Fernflower" -> new FernflowerAdapter(locateFernflowerLike(), timeoutMinutes);
+                case "Vineflower" -> new VineflowerAdapter(DecompilerLocator.locate("vineflower"), timeoutMinutes);
                 default           -> throw new IllegalArgumentException(
                         "Unknown decompiler: " + name);
             };

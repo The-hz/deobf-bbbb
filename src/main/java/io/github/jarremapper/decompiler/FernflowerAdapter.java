@@ -17,6 +17,12 @@ public class FernflowerAdapter extends ProcessDecompiler {
     private final Path jar;
 
     public FernflowerAdapter(Path jar) {
+        super();
+        this.jar = jar;
+    }
+
+    public FernflowerAdapter(Path jar, long timeoutMinutes) {
+        super(timeoutMinutes);
         this.jar = jar;
     }
 

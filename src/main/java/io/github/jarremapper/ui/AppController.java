@@ -90,6 +90,9 @@ public class AppController implements PipelineCallback {
     private final ObservableList<MatchResult> results = FXCollections.observableArrayList();
     private final AtomicReference<Task<?>> runningTask = new AtomicReference<>();
     private volatile boolean cancelled = false;
+    /** P1-9: when set by the "Skip All Remaining" button, all subsequent
+     *  askForName() calls auto-Skip (return null) without showing a dialog. */
+    private volatile boolean skipAllRemaining = false;
     private volatile Dialog<String> currentDialog;
 
     /* ---------- init ---------- */
@@ -269,6 +272,7 @@ public class AppController implements PipelineCallback {
         results.clear();
         logArea.clear();
         cancelled = false;
+        skipAllRemaining = false;   // reset for the new run
         runButton.setDisable(true);
         cancelButton.setDisable(false);
 
@@ -358,6 +362,7 @@ public class AppController implements PipelineCallback {
     @Override
     public String askForName(ClassInfo unmappedClass, String decompiledSource) {
         if (isCancelled()) return null;
+        if (skipAllRemaining) return null;     // P1-9: batch "Skip All"
 
         CountDownLatch latch = new CountDownLatch(1);
         final String[] result = new String[1];
@@ -369,7 +374,14 @@ public class AppController implements PipelineCallback {
             }
         });
         try {
-            latch.await();
+            // P1-7: 5-minute timeout — if the user walks away without
+            // picking a name, the pipeline auto-Skips instead of hanging
+            // the worker thread (and the JVM shutdown) forever.
+            if (!latch.await(5, java.util.concurrent.TimeUnit.MINUTES)) {
+                log("askForName timed out after 5 min — auto-skipping " +
+                        unmappedClass.internalName());
+                return null;
+            }
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             return null;
@@ -404,14 +416,22 @@ public class AppController implements PipelineCallback {
         vbox.getChildren().addAll(sourceLabel, sourceArea, prompt, nameField);
         dialog.getDialogPane().setContent(vbox);
 
-        ButtonType saveBtn = new ButtonType("Save", ButtonBar.ButtonData.OK_DONE);
-        ButtonType skipBtn = new ButtonType("Skip", ButtonBar.ButtonData.CANCEL_CLOSE);
-        dialog.getDialogPane().getButtonTypes().addAll(saveBtn, skipBtn);
+        ButtonType saveBtn       = new ButtonType("Save", ButtonBar.ButtonData.OK_DONE);
+        ButtonType skipBtn       = new ButtonType("Skip", ButtonBar.ButtonData.CANCEL_CLOSE);
+        // P1-9: batch "Skip All Remaining" — closes the dialog and sets a
+        // flag that makes subsequent askForName() calls auto-Skip.
+        ButtonType skipAllBtn    = new ButtonType("Skip All Remaining", ButtonBar.ButtonData.OTHER);
+        dialog.getDialogPane().getButtonTypes().addAll(saveBtn, skipBtn, skipAllBtn);
 
         dialog.setResultConverter(btn -> {
             if (btn == saveBtn) {
                 String t = nameField.getText() == null ? "" : nameField.getText().trim();
                 return t.isBlank() ? null : t;
+            }
+            if (btn == skipAllBtn) {
+                skipAllRemaining = true;
+                log("User picked 'Skip All Remaining' — all subsequent " +
+                        "unmatched classes will be auto-identity-mapped.");
             }
             return null;
         });

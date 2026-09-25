@@ -14,6 +14,12 @@ public class CfrAdapter extends ProcessDecompiler {
     private final Path jar;
 
     public CfrAdapter(Path jar) {
+        super();
+        this.jar = jar;
+    }
+
+    public CfrAdapter(Path jar, long timeoutMinutes) {
+        super(timeoutMinutes);
         this.jar = jar;
     }
 

@@ -37,8 +37,17 @@ public abstract class ProcessDecompiler implements Decompiler {
 
     private static final Logger LOG = LoggerFactory.getLogger(ProcessDecompiler.class);
 
-    /** Child-JVM timeout in minutes (15 by default — generously large). */
-    private static final long TIMEOUT_MINUTES = 15;
+    /** Child-JVM timeout in minutes (default 15; configurable via
+     * {@link io.github.jarremapper.config.AppConfig#decompilerTimeoutMinutes()}). */
+    private final long timeoutMinutes;
+
+    protected ProcessDecompiler() {
+        this(15);
+    }
+
+    protected ProcessDecompiler(long timeoutMinutes) {
+        this.timeoutMinutes = timeoutMinutes <= 0 ? 15 : timeoutMinutes;
+    }
 
     /** Subclasses turn options + paths into CLI args. */
     protected abstract String[] buildArgs(Path input, Path outputDir, Map<String, String> options);
@@ -83,10 +92,10 @@ public abstract class ProcessDecompiler implements Decompiler {
         drain.setDaemon(true);
         drain.start();
 
-        boolean finished = proc.waitFor(TIMEOUT_MINUTES, TimeUnit.MINUTES);
+        boolean finished = proc.waitFor(timeoutMinutes, TimeUnit.MINUTES);
         if (!finished) {
             proc.destroyForcibly();
-            throw new IOException(name() + " decompiler timed out after " + TIMEOUT_MINUTES + " min");
+            throw new IOException(name() + " decompiler timed out after " + timeoutMinutes + " min");
         }
         int code = proc.exitValue();
         drain.join(2000);
@@ -98,6 +107,21 @@ public abstract class ProcessDecompiler implements Decompiler {
 
     private static void ensureEmptyOrClean(Path dir) throws IOException {
         if (!Files.isDirectory(dir)) return;
+        // P1-8: refuse to recursively delete anything outside the current
+        // working directory or the system temp directory. This protects
+        // against accidental misuse of the API (e.g. someone passing
+        // outputDir = ~ or /).
+        Path canonical = dir.toAbsolutePath().normalize();
+        Path cwd       = Path.of(System.getProperty("user.dir")).toAbsolutePath().normalize();
+        Path tmp       = Path.of(System.getProperty("java.io.tmpdir")).toAbsolutePath().normalize();
+        if (!canonical.startsWith(cwd) && !canonical.startsWith(tmp)) {
+            throw new IOException("Refuse to clean dir outside CWD/temp: " + canonical +
+                    " (cwd=" + cwd + ", tmp=" + tmp + ")");
+        }
+        // Also refuse to delete the cwd or tmp root themselves.
+        if (canonical.equals(cwd) || canonical.equals(tmp)) {
+            throw new IOException("Refuse to clean the CWD or temp root: " + canonical);
+        }
         try (var stream = Files.list(dir)) {
             if (stream.findAny().isEmpty()) return;
         }

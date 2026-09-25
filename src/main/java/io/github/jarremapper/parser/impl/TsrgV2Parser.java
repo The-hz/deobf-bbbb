@@ -73,8 +73,8 @@ public class TsrgV2Parser implements MappingParser {
                     model.put(currentObf, currentOrig);
                 }
             } else {
-                // member line: ["", "m", obf-name, marker?, orig-name, desc?]
-                // or ["", obf-name, orig-name, desc?]
+                // member line: ["", "m"|"f", obf-name, marker-int?, orig-name, desc?]
+                // OR (no marker): ["", obf-name, orig-name, desc?]
                 if (currentObf == null || parts.length < 3) continue;
                 int idx = 1;
                 String marker = parts[idx];
@@ -82,16 +82,23 @@ public class TsrgV2Parser implements MappingParser {
                 if (hasMarker) idx++;
                 if (parts.length < idx + 2) continue;
                 String obfName = parts[idx];
-                String next  = parts[idx + 1];
+                String next    = parts[idx + 1];
                 String origName;
                 String desc;
-                // Detect descriptor position by looking for "(" or a type descriptor prefix.
-                if (parts.length >= idx + 3 && looksLikeDesc(parts[idx + 2])) {
-                    // obf-name, <marker-int>, orig-name, desc
+
+                // Detect & skip an integer "marker" (the 0/1 side-annotation
+                // column that Mojang's tsrg v2 includes for some members).
+                // The marker is a sequence of digits, not a descriptor.
+                if (isInteger(next) && parts.length >= idx + 3) {
+                    // layout: obf-name, marker-int, orig-name, desc
+                    origName = parts[idx + 2];
+                    desc = (parts.length >= idx + 4) ? parts[idx + 3] : descFallbackFor(marker);
+                } else if (parts.length >= idx + 3 && looksLikeDesc(parts[idx + 2])) {
+                    // layout: obf-name, orig-name, desc (no marker)
                     origName = next;
                     desc = parts[idx + 2];
                 } else if (parts.length >= idx + 3 && looksLikeDesc(next)) {
-                    // obf-name, orig-name(?), desc — less common, fallback
+                    // less-common: obf-name, orig-name(?), desc — fallback
                     origName = parts[idx + 2];
                     desc = next;
                 } else {
@@ -126,5 +133,16 @@ public class TsrgV2Parser implements MappingParser {
 
     private static String descFallbackFor(String marker) {
         return "m".equals(marker) ? "()V" : "I";
+    }
+
+    /** True if {@code s} looks like an integer (all digits, possibly with leading {@code -}). */
+    private static boolean isInteger(String s) {
+        if (s == null || s.isEmpty()) return false;
+        int i = 0;
+        if (s.charAt(0) == '-' && s.length() > 1) i = 1;
+        for (; i < s.length(); i++) {
+            if (!Character.isDigit(s.charAt(i))) return false;
+        }
+        return true;
     }
 }

@@ -137,19 +137,96 @@ public final class BytecodeStructureHash {
     }
 
     /** Small struct returned by {@link #analyze(MethodNode)} to populate MethodInfo. */
-    public record Fingerprint(int hash, int insnCount, int maxStack, int maxLocals) {
-        public static Fingerprint empty() { return new Fingerprint(0, 0, 0, 0); }
+    public record Fingerprint(int hash, int coarseHash, int insnCount, int maxStack, int maxLocals) {
+        public static Fingerprint empty() { return new Fingerprint(0, 0, 0, 0, 0); }
     }
 
     /**
      * Run a single-pass fingerprint extraction over the given {@link MethodNode}.
-     * Returns the 32-bit truncation of {@link #fingerprintOf(MethodNode)} plus
-     * the raw insn count and stack/local bounds.
+     * Returns:
+     * <ul>
+     *   <li>{@code hash} — the 32-bit truncation of the rolling fine fingerprint
+     *       (sensitive to instruction insertions / reordering).</li>
+     *   <li>{@code coarseHash} — a 32-bit hash of the opcode-category histogram
+     *       (robust to small instruction insertions, e.g. obfuscator-added
+     *       {@code iconst_0} / {@code pop} pairs or basic-block shuffles).</li>
+     *   <li>{@code insnCount}, {@code maxStack}, {@code maxLocals} — same as before.</li>
+     * </ul>
      */
     public static Fingerprint analyze(MethodNode mn) {
         long fp = fingerprintOf(mn);
         int hash = (int) (fp ^ (fp >>> 32));
+        int coarse = coarseFingerprintOf(mn);
         int insn = mn.instructions == null ? 0 : mn.instructions.size();
-        return new Fingerprint(hash, insn, mn.maxStack, mn.maxLocals);
+        return new Fingerprint(hash, coarse, insn, mn.maxStack, mn.maxLocals);
+    }
+
+    /**
+     * Compute a coarse histogram-based fingerprint. We bucket each opcode
+     * into a small set of categories (load, store, arithmetic, branch,
+     * invoke, return, get/put, new, throw, monitor, primitive conversion,
+     * other) and hash the resulting histogram.
+     *
+     * <p>This signal is intentionally coarse: two methods with the same
+     * opcode-category histogram get the same coarse fingerprint, even if
+     * individual opcodes were inserted/removed. The matcher uses it as a
+     * fallback when the fine rolling-hash doesn't match — giving partial
+     * credit rather than zero.</p>
+     */
+    public static int coarseFingerprintOf(MethodNode mn) {
+        if (mn.instructions == null) return 0;
+        int[] counts = new int[12];   // 12 opcode categories
+        for (AbstractInsnNode n = mn.instructions.getFirst(); n != null; n = n.getNext()) {
+            int op = n.getOpcode();
+            if (op == -1) continue;  // label / frame
+            int cat = opcodeCategory(op);
+            counts[cat]++;
+        }
+        long h = 0x9E3779B97F4A7C15L;
+        for (int c : counts) {
+            h = h * 31L + c;
+        }
+        int r = (int) (h ^ (h >>> 32));
+        return r == 0 ? 1 : r;
+    }
+
+    /** Map an ASM opcode to one of 12 coarse categories. */
+    private static int opcodeCategory(int op) {
+        // See JVM spec opcode ranges.
+        if (op == 0x00) return 10; // NOP → "other"
+        if (op == 0x01) return 0; // ACONST_NULL → load
+        if (op <= 0x10) return 0; // const variants → load (ICONST_* / BIPUSH / SIPUSH / LDC etc.)
+        if (op <= 0x15) return 0; // LDC variants
+        if (op >= 0x15 && op <= 0x19) return 0; // *LOAD_n
+        if (op >= 0x1A && op <= 0x2D) return 0; // *LOAD
+        if (op >= 0x2E && op <= 0x35) return 6; // *ALOAD / *STORE
+        if (op >= 0x36 && op <= 0x3A) return 1; // *STORE
+        if (op >= 0x3B && op <= 0x4E) return 1; // *STORE_n
+        if (op >= 0x4F && op <= 0x56) return 1; // ASTORE
+        if (op >= 0x57 && op <= 0x58) return 10; // POP / POP2 → other
+        if (op >= 0x59 && op <= 0x5F) return 10; // DUP/SWAP → other
+        if (op >= 0x60 && op <= 0x77) return 2; // arithmetic
+        if (op >= 0x78 && op <= 0x83) return 2; // shifts/logical
+        if (op >= 0x84 && op <= 0x93) return 10; // IINC → other (conversion-like)
+        if (op >= 0x94 && op <= 0x98) return 2; // LCMP / FCMPL / etc.
+        if (op >= 0x99 && op <= 0xA8) return 3; // branch (IFEQ ... GOTO)
+        if (op == 0xA9) return 3; // JSR
+        if (op == 0xAA) return 3; // RET
+        if (op == 0xAB) return 3; // TABLESWITCH
+        if (op == 0xAC) return 3; // LOOKUPSWITCH
+        if (op >= 0xAD && op <= 0xB1) return 4; // return family (incl. void)
+        if (op >= 0xB2 && op <= 0xB5) return 6; // GETSTATIC/PUTSTATIC/GETFIELD/PUTFIELD
+        if (op >= 0xB6 && op <= 0xB9) return 5; // INVOKE*
+        if (op == 0xBA) return 5; // INVOKEDYNAMIC
+        if (op == 0xBB) return 7; // NEW
+        if (op == 0xBC) return 7; // ANEWARRAY
+        if (op == 0xBD) return 7; // NEWARRAY
+        if (op == 0xBE) return 0; // ARRAYLENGTH
+        if (op == 0xBF) return 8; // ATHROW
+        if (op == 0xC0) return 7; // CHECKCAST
+        if (op == 0xC1) return 7; // INSTANCEOF
+        if (op >= 0xC2 && op <= 0xC8) return 11; // MONITORENTER/EXIT, MULTIANEWARRAY, IFNULL/IFNONNULL, GOTO_W
+        if (op == 0xC9) return 3; // JSR_W
+        return 10; // fallback
     }
 }

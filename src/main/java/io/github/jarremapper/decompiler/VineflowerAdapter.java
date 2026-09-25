@@ -19,6 +19,12 @@ public class VineflowerAdapter extends ProcessDecompiler {
     private final Path jar;
 
     public VineflowerAdapter(Path jar) {
+        super();
+        this.jar = jar;
+    }
+
+    public VineflowerAdapter(Path jar, long timeoutMinutes) {
+        super(timeoutMinutes);
         this.jar = jar;
     }
 

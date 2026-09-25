@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <!-- Console appender for stdout (INFO+) -->
+    <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{HH:mm:ss.SSS} %-5level [%thread] %logger{24} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <!-- File appender for ./jarremapper.log -->
+    <appender name="FILE" class="ch.qos.logback.core.FileAppender">
+        <file>jarremapper.log</file>
+        <append>false</append>
+        <encoder>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%thread] %logger{36} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <!-- Root: INFO to console, DEBUG to file -->
+    <root level="INFO">
+        <appender-ref ref="STDOUT"/>
+        <appender-ref ref="FILE"/>
+    </root>
+
+    <!-- Quiet down chatty loggers from the decompiler / ASM -->
+    <logger name="org.objectweb.asm" level="WARN"/>
+    <logger name="org.benf.cfr" level="WARN"/>
+    <logger name="org.jetbrains.java.decompiler" level="WARN"/>
+    <logger name="io.github.jarremapper" level="INFO"/>
+</configuration>

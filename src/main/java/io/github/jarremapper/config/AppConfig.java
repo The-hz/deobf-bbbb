@@ -19,11 +19,13 @@ public record AppConfig(
         Path unmappedJar,
         Path outputDir,
         double similarityThreshold,
-        String decompilerName
+        String decompilerName,
+        int decompilerTimeoutMinutes
 ) {
 
     public static final double DEFAULT_THRESHOLD = 0.70;
     public static final String DEFAULT_OUTPUT_DIR = "./output";
+    public static final int DEFAULT_DECOMPILER_TIMEOUT_MIN = 15;
 
     public static Builder builder() {
         return new Builder();
@@ -40,18 +42,20 @@ public record AppConfig(
         private Path outputDir = Path.of(DEFAULT_OUTPUT_DIR).toAbsolutePath();
         private double similarityThreshold = DEFAULT_THRESHOLD;
         private String decompilerName = "CFR";
+        private int decompilerTimeoutMinutes = DEFAULT_DECOMPILER_TIMEOUT_MIN;
 
-        public Builder targetJar(Path v)           { this.targetJar = v; return this; }
-        public Builder mappingFile(Path v)          { this.mappingFile = v; return this; }
-        public Builder unmappedJar(Path v)          { this.unmappedJar = v; return this; }
-        public Builder outputDir(Path v)            { this.outputDir = v; return this; }
-        public Builder similarityThreshold(double v){ this.similarityThreshold = v; return this; }
-        public Builder decompilerName(String v)     { this.decompilerName = v; return this; }
+        public Builder targetJar(Path v)             { this.targetJar = v; return this; }
+        public Builder mappingFile(Path v)            { this.mappingFile = v; return this; }
+        public Builder unmappedJar(Path v)            { this.unmappedJar = v; return this; }
+        public Builder outputDir(Path v)             { this.outputDir = v; return this; }
+        public Builder similarityThreshold(double v) { this.similarityThreshold = v; return this; }
+        public Builder decompilerName(String v)        { this.decompilerName = v; return this; }
+        public Builder decompilerTimeoutMinutes(int v){ this.decompilerTimeoutMinutes = v; return this; }
 
         public AppConfig build() {
             return new AppConfig(
                     targetJar, mappingFile, unmappedJar, outputDir,
-                    similarityThreshold, decompilerName);
+                    similarityThreshold, decompilerName, decompilerTimeoutMinutes);
         }
     }
 }

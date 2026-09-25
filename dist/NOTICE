@@ -1,0 +1,76 @@
+JarRemapper NOTICE
+==================
+
+This product bundles the following third-party libraries, each licensed
+under the terms indicated below. The JarRemapper source itself is
+licensed under the GNU General Public License v3.0 (see ../LICENSE).
+
+This NOTICE file is provided in compliance with the attribution
+requirements of each bundled license. Users who redistribute the
+prebuilt distribution (dist/) must include this file alongside the
+redistribution.
+
+Bundled runtime dependencies in dist/lib/
+-----------------------------------------
+
+  * ASM 9.7 (org.ow2.asm:asm, asm-tree, asm-commons)
+    License: BSD-3-Clause (https://asm.ow2.io/license.html)
+    Copyright (c) 2000-2011 France Télécom, INRIA, France
+
+  * CFR 0.152 (org.benf:cfr)
+    License: MIT (https://github.com/leibnitz27/cfr/blob/master/LICENSE)
+    Copyright (c) 2011-2024 Lee R. Benfield
+
+  * Vineflower 1.10.1 (org.vineflower:vineflower)
+    License: Apache-2.0 (https://github.com/Vineflower/vineflower/blob/main/LICENSE.txt)
+    Copyright (c) 2018-2024 Vineflower contributors
+
+  * Quiltflower 1.9.0 (org.quiltmc:quiltflower)
+    License: Apache-2.0 (https://github.com/QuiltMC/quiltflower/blob/main/LICENSE.txt)
+    Copyright (c) 2017-2021 QuiltMC contributors
+    (Originally based on JetBrains Fernflower, also Apache-2.0.)
+
+  * JavaFX 21.0.2 (org.openjfx:javafx-base/controls/fxml/graphics)
+    License: GPL-2.0 + Classpath Exception
+    (https://github.com/openjdk/jfx/blob/master/LICENSE)
+    Copyright (c) 2011-2024 Oracle and/or its affiliates.
+
+  * SLF4J 2.0.13 (org.slf4j:slf4j-api)
+    License: MIT (http://www.slf4j.org/license.html)
+    Copyright (c) 2004-2024 QOS.ch Sarl
+
+  * Logback 1.5.6 (ch.qos.logback:logback-classic, logback-core)
+    License: EPL-1.0 + LGPL-2.1 dual
+    (https://logback.qos.ch/license.html)
+    Copyright (c) 1999-2024 QOS.ch Sarl
+
+License compatibility notes
+----------------------------
+
+The GPL-3.0-licensed JarRemapper links against the libraries listed
+above at runtime via a separate child JVM (for the decompilers) or
+directly (for ASM, SLF4J, Logback, JavaFX). The licenses of all bundled
+dependencies permit such linking with GPL-3.0-licensed works, subject
+to the following notes:
+
+  * JavaFX is licensed under GPL-2.0 + Classpath Exception, which
+    explicitly permits dynamic linking with code under any license.
+  * ASM (BSD-3-Clause), CFR (MIT), Quiltflower (Apache-2.0),
+    Vineflower (Apache-2.0), and SLF4J (MIT) are permissive licenses
+    that allow combination with GPL-3.0 works.
+  * Logback is dual-licensed under EPL-1.0 OR LGPL-2.1; both licenses
+    permit linking with GPL-3.0 code (the LGPL-2.1 explicitly allows
+    dynamic linking with non-LGPL code).
+
+Sources for the bundled jars
+----------------------------
+
+All jars were obtained from Maven Central (https://repo1.maven.org/maven2/)
+with the exception of the JavaFX Linux jars, which come from
+org.openjfx:javafx-*-linux Maven Central artifacts.
+
+The Quiltflower 1.9.0 jar is included as the runtime fallback for the
+"Fernflower" combo box entry. Users who want the very latest JetBrains
+Fernflower build can drop a manually-obtained `fernflower*.jar` into
+the `../lib/` directory; the `DecompilerLocator` will pick it up at
+runtime in preference to Quiltflower.

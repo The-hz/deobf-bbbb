@@ -52,8 +52,7 @@ dependencies {
     // https://github.com/JetBrains/intellij-community/raw/master/plugins/java-decompiler/engine/fernflower.jar
     // (or build it from source) and drop the jar into ./lib/ — the
     // `fernflower` jar-finder will pick it up from there at runtime.
-    //
-    // runtimeOnly      fileTree(dir: 'lib', include: ['fernflower*.jar'])
+    runtimeOnly      fileTree(dir: 'lib', include: ['fernflower*.jar'])
 
     // Tests
     testImplementation 'org.junit.jupiter:junit-jupiter:5.10.2'

@@ -18,15 +18,17 @@ public class MethodInfo {
     private final MemberKey key;
     private final int access;
     private final int insnFingerprint;
+    private final int coarseFingerprint;
     private final int maxStack;
     private final int maxLocals;
     private final int insnCount;
 
-    public MethodInfo(MemberKey key, int access, int insnFingerprint,
+    public MethodInfo(MemberKey key, int access, int insnFingerprint, int coarseFingerprint,
                       int maxStack, int maxLocals, int insnCount) {
         this.key = key;
         this.access = access;
         this.insnFingerprint = insnFingerprint;
+        this.coarseFingerprint = coarseFingerprint;
         this.maxStack = maxStack;
         this.maxLocals = maxLocals;
         this.insnCount = insnCount;
@@ -37,6 +39,7 @@ public class MethodInfo {
     public String descriptor()         { return key.descriptor(); }
     public int    access()             { return access; }
     public int    insnFingerprint()    { return insnFingerprint; }
+    public int    coarseFingerprint()  { return coarseFingerprint; }
     public int    maxStack()           { return maxStack; }
     public int    maxLocals()          { return maxLocals; }
     public int    insnCount()          { return insnCount; }
@@ -45,6 +48,7 @@ public class MethodInfo {
     public String toString() {
         return "Method[" + key + " / acc=0x" + Integer.toHexString(access) +
                 " / fp=0x" + Integer.toHexString(insnFingerprint) +
+                " / coarse=0x" + Integer.toHexString(coarseFingerprint) +
                 " / #insn=" + insnCount + "]";
     }
 }

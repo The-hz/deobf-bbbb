@@ -154,13 +154,19 @@ public class MappingModel {
         String mapped = e.fields().get(MemberKey.of(name, desc));
         if (mapped != null) return mapped;
         // Fallback: same field name on this class, ignoring descriptor.
-        // Safe because the JVM forbids two fields with the same name on the
-        // same class (no field overloading in Java).
+        // Bail out if ambiguous — the JVM forbids two fields with the same
+        // name on the same class file, but a model can still be merged from
+        // multiple files (or include inherited entries). Returning the obf
+        // name when ambiguous is the safe choice — better no rename than
+        // an incorrect rename.
+        String fallback = null;
+        int hits = 0;
         for (Map.Entry<MemberKey, String> fe : e.fields().entrySet()) {
             if (fe.getKey().name().equals(name)) {
-                return fe.getValue();
+                fallback = fe.getValue();
+                hits++;
             }
         }
-        return name;
+        return hits == 1 ? fallback : name;
     }
 }
