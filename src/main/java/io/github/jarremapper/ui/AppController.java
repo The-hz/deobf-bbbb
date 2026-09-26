@@ -58,6 +58,7 @@ public class AppController implements PipelineCallback {
     @FXML private Button runButton;
     @FXML private Button cancelButton;
     @FXML private Button openOutputButton;
+    @FXML private Button browseOutputButton;
 
     @FXML private VBox   targetJarZone;
     @FXML private VBox   mappingFileZone;
@@ -86,6 +87,9 @@ public class AppController implements PipelineCallback {
     private Path targetJarPath;
     private Path mappingFilePath;
     private Path unmappedJarPath;
+    /** P2 review: user-configurable output directory (defaults to ./output
+     *  when null, set via the "Browse…" button below the toolbar). */
+    private Path outputDirPath;
 
     private final ObservableList<MatchResult> results = FXCollections.observableArrayList();
     private final AtomicReference<Task<?>> runningTask = new AtomicReference<>();
@@ -105,17 +109,21 @@ public class AppController implements PipelineCallback {
             thresholdLabel.setText(pct + "%");
         });
 
-        // Populate decompiler combo with whatever is actually available.
+        // Populate decompiler combo. "Quiltflower" is the user-facing name
+        // for the Maven Central org.quiltmc:quiltflower artifact (a
+        // community-maintained Fernflower fork). It exposes the same
+        // ConsoleDecompiler main class as Fernflower — the registry
+        // resolves the actual jar at runtime, trying fernflower*.jar in
+        // ./lib/ first, then quiltflower*.jar from the Maven classpath.
         Map<String, Path> available = DecompilerRegistry.available();
         if (available.isEmpty()) {
-            // Fallback to all three labels — they may resolve later.
-            decompilerCombo.getItems().addAll("CFR", "Fernflower", "Vineflower");
+            decompilerCombo.getItems().addAll("CFR", "Quiltflower", "Vineflower");
         } else {
             // Show each entry, marking unavailable ones as "(missing)".
             if (available.containsKey("CFR"))         decompilerCombo.getItems().add("CFR");
             else                                       decompilerCombo.getItems().add("CFR (unavailable)");
-            if (available.containsKey("Fernflower")) decompilerCombo.getItems().add("Fernflower");
-            else                                       decompilerCombo.getItems().add("Fernflower (unavailable)");
+            if (available.containsKey("Fernflower")) decompilerCombo.getItems().add("Quiltflower");
+            else                                       decompilerCombo.getItems().add("Quiltflower (unavailable)");
             if (available.containsKey("Vineflower")) decompilerCombo.getItems().add("Vineflower");
             else                                       decompilerCombo.getItems().add("Vineflower (unavailable)");
         }
@@ -257,8 +265,14 @@ public class AppController implements PipelineCallback {
             log("Decompiler not available, falling back to CFR.");
             decName = "CFR";
         }
+        // The combo shows "Quiltflower" (the Maven Central artifact name)
+        // but the registry uses "Fernflower" as its internal key. Translate.
+        if ("Quiltflower".equals(decName)) {
+            decName = "Fernflower";
+        }
         double threshold = thresholdSlider.getValue() / 100.0;
-        Path outputDir = Path.of(System.getProperty("user.dir"), "output").toAbsolutePath();
+        Path outputDir = outputDirPath != null ? outputDirPath
+                : Path.of(System.getProperty("user.dir"), "output").toAbsolutePath();
 
         AppConfig config = AppConfig.builder()
                 .targetJar(targetJarPath)
@@ -316,7 +330,8 @@ public class AppController implements PipelineCallback {
 
     @FXML
     private void onOpenOutput() {
-        Path outDir = Path.of(System.getProperty("user.dir"), "output").toAbsolutePath();
+        Path outDir = outputDirPath != null ? outputDirPath
+                : Path.of(System.getProperty("user.dir"), "output").toAbsolutePath();
         try {
             Files.createDirectories(outDir);
             String os = System.getProperty("os.name").toLowerCase();
@@ -331,6 +346,20 @@ public class AppController implements PipelineCallback {
             new ProcessBuilder(cmd).start();
         } catch (IOException e) {
             log("Could not open output directory: " + e.getMessage());
+        }
+    }
+
+    /** P2 review: let the user pick a custom output directory. */
+    @FXML
+    private void onBrowseOutput() {
+        javafx.stage.DirectoryChooser chooser = new javafx.stage.DirectoryChooser();
+        chooser.setTitle("Choose output directory");
+        chooser.setInitialDirectory(new File(System.getProperty("user.dir")));
+        File f = chooser.showDialog(stage);
+        if (f != null) {
+            outputDirPath = f.toPath().toAbsolutePath();
+            browseOutputButton.setText("Output: " + outputDirPath.getFileName());
+            log("Output directory set to: " + outputDirPath);
         }
     }
 

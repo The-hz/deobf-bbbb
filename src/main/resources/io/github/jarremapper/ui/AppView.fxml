@@ -39,6 +39,8 @@
             prefWidth="100"/>
     <Button fx:id="cancelButton" text="Cancel" styleClass="secondary-button" disable="true"
             onAction="#onCancel" prefWidth="100"/>
+    <Button fx:id="browseOutputButton" text="Output: ./output" styleClass="secondary-button"
+            onAction="#onBrowseOutput" prefWidth="180"/>
     <Button fx:id="openOutputButton" text="Open output" onAction="#onOpenOutput"
             styleClass="secondary-button" prefWidth="120"/>
   </HBox>

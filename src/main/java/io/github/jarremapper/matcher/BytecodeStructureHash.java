@@ -163,9 +163,8 @@ public final class BytecodeStructureHash {
 
     /**
      * Compute a coarse histogram-based fingerprint. We bucket each opcode
-     * into a small set of categories (load, store, arithmetic, branch,
-     * invoke, return, get/put, new, throw, monitor, primitive conversion,
-     * other) and hash the resulting histogram.
+     * into one of 11 categories (see {@link #opcodeCategory(int)}) and hash
+     * the resulting histogram.
      *
      * <p>This signal is intentionally coarse: two methods with the same
      * opcode-category histogram get the same coarse fingerprint, even if
@@ -175,12 +174,11 @@ public final class BytecodeStructureHash {
      */
     public static int coarseFingerprintOf(MethodNode mn) {
         if (mn.instructions == null) return 0;
-        int[] counts = new int[12];   // 12 opcode categories
+        int[] counts = new int[11];   // 11 opcode categories, see opcodeCategory
         for (AbstractInsnNode n = mn.instructions.getFirst(); n != null; n = n.getNext()) {
             int op = n.getOpcode();
             if (op == -1) continue;  // label / frame
-            int cat = opcodeCategory(op);
-            counts[cat]++;
+            counts[opcodeCategory(op)]++;
         }
         long h = 0x9E3779B97F4A7C15L;
         for (int c : counts) {
@@ -190,43 +188,133 @@ public final class BytecodeStructureHash {
         return r == 0 ? 1 : r;
     }
 
-    /** Map an ASM opcode to one of 12 coarse categories. */
-    private static int opcodeCategory(int op) {
-        // See JVM spec opcode ranges.
-        if (op == 0x00) return 10; // NOP → "other"
-        if (op == 0x01) return 0; // ACONST_NULL → load
-        if (op <= 0x10) return 0; // const variants → load (ICONST_* / BIPUSH / SIPUSH / LDC etc.)
-        if (op <= 0x15) return 0; // LDC variants
-        if (op >= 0x15 && op <= 0x19) return 0; // *LOAD_n
-        if (op >= 0x1A && op <= 0x2D) return 0; // *LOAD
-        if (op >= 0x2E && op <= 0x35) return 6; // *ALOAD / *STORE
-        if (op >= 0x36 && op <= 0x3A) return 1; // *STORE
-        if (op >= 0x3B && op <= 0x4E) return 1; // *STORE_n
-        if (op >= 0x4F && op <= 0x56) return 1; // ASTORE
-        if (op >= 0x57 && op <= 0x58) return 10; // POP / POP2 → other
-        if (op >= 0x59 && op <= 0x5F) return 10; // DUP/SWAP → other
-        if (op >= 0x60 && op <= 0x77) return 2; // arithmetic
-        if (op >= 0x78 && op <= 0x83) return 2; // shifts/logical
-        if (op >= 0x84 && op <= 0x93) return 10; // IINC → other (conversion-like)
-        if (op >= 0x94 && op <= 0x98) return 2; // LCMP / FCMPL / etc.
-        if (op >= 0x99 && op <= 0xA8) return 3; // branch (IFEQ ... GOTO)
-        if (op == 0xA9) return 3; // JSR
-        if (op == 0xAA) return 3; // RET
-        if (op == 0xAB) return 3; // TABLESWITCH
-        if (op == 0xAC) return 3; // LOOKUPSWITCH
-        if (op >= 0xAD && op <= 0xB1) return 4; // return family (incl. void)
-        if (op >= 0xB2 && op <= 0xB5) return 6; // GETSTATIC/PUTSTATIC/GETFIELD/PUTFIELD
-        if (op >= 0xB6 && op <= 0xB9) return 5; // INVOKE*
-        if (op == 0xBA) return 5; // INVOKEDYNAMIC
-        if (op == 0xBB) return 7; // NEW
-        if (op == 0xBC) return 7; // ANEWARRAY
-        if (op == 0xBD) return 7; // NEWARRAY
-        if (op == 0xBE) return 0; // ARRAYLENGTH
-        if (op == 0xBF) return 8; // ATHROW
-        if (op == 0xC0) return 7; // CHECKCAST
-        if (op == 0xC1) return 7; // INSTANCEOF
-        if (op >= 0xC2 && op <= 0xC8) return 11; // MONITORENTER/EXIT, MULTIANEWARRAY, IFNULL/IFNONNULL, GOTO_W
-        if (op == 0xC9) return 3; // JSR_W
-        return 10; // fallback
+    /**
+     * Map an ASM opcode to one of 11 coarse categories. The category set is:
+     * <ul>
+     *   <li>{@code 0} — load (constants + local loads + array loads + arraylength)</li>
+     *   <li>{@code 1} — store (local stores + array stores)</li>
+     *   <li>{@code 2} — arithmetic (add/sub/mul/div/rem/neg/shift/logical/conv/cmp/iinc)</li>
+     *   <li>{@code 3} — branch (if* / goto / jsr / ret / switch / goto_w / jsr_w / ifnull / ifnonnull)</li>
+     *   <li>{@code 4} — return</li>
+     *   <li>{@code 5} — invoke (invoke* + invokedynamic)</li>
+     *   <li>{@code 6} — field get/put (getstatic / putstatic / getfield / putfield)</li>
+     *   <li>{@code 7} — new + type (new / newarray / anewarray / checkcast / instanceof)</li>
+     *   <li>{@code 8} — throw (athrow)</li>
+     *   <li>{@code 9} — monitor (monitorenter / monitorexit / multianewarray)</li>
+     *   <li>{@code 10} — other (nop / pop / pop2 / dup* / swap / wide)</li>
+     * </ul>
+     *
+     * <p>The table is exhaustive over the standard JVM opcode space
+     * (0x00 .. 0xC9) plus a default case for any reserved opcodes (BREAKPOINT,
+     * IMPDEP1, IMPDEP2) that round to {@code 10} (other).</p>
+     */
+    static int opcodeCategory(int op) {
+        // Using a switch expression with explicit opcode constants from
+        // Opcodes. ASM normalizes the JVM spec's "_0..3" short forms
+        // (ILOAD_0..3, etc.), LDC_W, LDC2_W, GOTO_W, JSR_W, and WIDE
+        // to their long forms (ILOAD, LDC, GOTO, JSR) when reading class
+        // files — so AbstractInsnNode.getOpcode() only ever returns the
+        // long-form constants. We list each explicitly; reserved opcodes
+        // (BREAKPOINT=202, IMPDEP1=254, IMPDEP2=255) round to "other"
+        // via the default branch.
+        return switch (op) {
+            // ----- 0: load (constants + local loads + array loads + arraylength) -----
+            case Opcodes.ACONST_NULL,
+                 Opcodes.ICONST_M1, Opcodes.ICONST_0, Opcodes.ICONST_1,
+                 Opcodes.ICONST_2, Opcodes.ICONST_3, Opcodes.ICONST_4, Opcodes.ICONST_5,
+                 Opcodes.LCONST_0, Opcodes.LCONST_1,
+                 Opcodes.FCONST_0, Opcodes.FCONST_1, Opcodes.FCONST_2,
+                 Opcodes.DCONST_0, Opcodes.DCONST_1,
+                 Opcodes.BIPUSH, Opcodes.SIPUSH,
+                 Opcodes.LDC,
+                 Opcodes.ILOAD, Opcodes.LLOAD, Opcodes.FLOAD, Opcodes.DLOAD, Opcodes.ALOAD,
+                 Opcodes.IALOAD, Opcodes.LALOAD, Opcodes.FALOAD, Opcodes.DALOAD,
+                 Opcodes.AALOAD, Opcodes.BALOAD, Opcodes.CALOAD, Opcodes.SALOAD,
+                 Opcodes.ARRAYLENGTH
+                    -> 0;
+
+            // ----- 1: store (local stores + array stores) -----
+            case Opcodes.ISTORE, Opcodes.LSTORE, Opcodes.FSTORE,
+                 Opcodes.DSTORE, Opcodes.ASTORE,
+                 Opcodes.IASTORE, Opcodes.LASTORE, Opcodes.FASTORE, Opcodes.DASTORE,
+                 Opcodes.AASTORE, Opcodes.BASTORE, Opcodes.CASTORE, Opcodes.SASTORE
+                    -> 1;
+
+            // ----- 2: arithmetic (add/sub/mul/div/rem/neg/shift/logical/conv/cmp/iinc) -----
+            case Opcodes.IADD, Opcodes.LADD, Opcodes.FADD, Opcodes.DADD,
+                 Opcodes.ISUB, Opcodes.LSUB, Opcodes.FSUB, Opcodes.DSUB,
+                 Opcodes.IMUL, Opcodes.LMUL, Opcodes.FMUL, Opcodes.DMUL,
+                 Opcodes.IDIV, Opcodes.LDIV, Opcodes.FDIV, Opcodes.DDIV,
+                 Opcodes.IREM, Opcodes.LREM, Opcodes.FREM, Opcodes.DREM,
+                 Opcodes.INEG, Opcodes.LNEG, Opcodes.FNEG, Opcodes.DNEG,
+                 Opcodes.ISHL, Opcodes.LSHL, Opcodes.ISHR, Opcodes.LSHR,
+                 Opcodes.IUSHR, Opcodes.LUSHR,
+                 Opcodes.IAND, Opcodes.LAND,
+                 Opcodes.IOR, Opcodes.LOR,
+                 Opcodes.IXOR, Opcodes.LXOR,
+                 Opcodes.IINC,
+                 Opcodes.I2L, Opcodes.I2F, Opcodes.I2D,
+                 Opcodes.L2I, Opcodes.L2F, Opcodes.L2D,
+                 Opcodes.F2I, Opcodes.F2L, Opcodes.F2D,
+                 Opcodes.D2I, Opcodes.D2L, Opcodes.D2F,
+                 Opcodes.I2B, Opcodes.I2C, Opcodes.I2S,
+                 Opcodes.LCMP, Opcodes.FCMPL, Opcodes.FCMPG,
+                 Opcodes.DCMPL, Opcodes.DCMPG
+                    -> 2;
+
+            // ----- 3: branch -----
+            case Opcodes.IFEQ, Opcodes.IFNE, Opcodes.IFLT, Opcodes.IFGE,
+                 Opcodes.IFGT, Opcodes.IFLE,
+                 Opcodes.IF_ICMPEQ, Opcodes.IF_ICMPNE,
+                 Opcodes.IF_ICMPLT, Opcodes.IF_ICMPGE,
+                 Opcodes.IF_ICMPGT, Opcodes.IF_ICMPLE,
+                 Opcodes.IF_ACMPEQ, Opcodes.IF_ACMPNE,
+                 Opcodes.IFNULL, Opcodes.IFNONNULL,
+                 Opcodes.GOTO, Opcodes.JSR,
+                 Opcodes.RET,
+                 Opcodes.TABLESWITCH, Opcodes.LOOKUPSWITCH
+                    -> 3;
+
+            // ----- 4: return -----
+            case Opcodes.IRETURN, Opcodes.LRETURN, Opcodes.FRETURN,
+                 Opcodes.DRETURN, Opcodes.ARETURN, Opcodes.RETURN
+                    -> 4;
+
+            // ----- 5: invoke -----
+            case Opcodes.INVOKEVIRTUAL, Opcodes.INVOKESPECIAL,
+                 Opcodes.INVOKESTATIC, Opcodes.INVOKEINTERFACE,
+                 Opcodes.INVOKEDYNAMIC
+                    -> 5;
+
+            // ----- 6: field get/put -----
+            case Opcodes.GETSTATIC, Opcodes.PUTSTATIC,
+                 Opcodes.GETFIELD, Opcodes.PUTFIELD
+                    -> 6;
+
+            // ----- 7: new + type ops -----
+            case Opcodes.NEW, Opcodes.NEWARRAY, Opcodes.ANEWARRAY,
+                 Opcodes.CHECKCAST, Opcodes.INSTANCEOF
+                    -> 7;
+
+            // ----- 8: throw -----
+            case Opcodes.ATHROW -> 8;
+
+            // ----- 9: monitor + multianewarray -----
+            case Opcodes.MONITORENTER, Opcodes.MONITOREXIT,
+                 Opcodes.MULTIANEWARRAY
+                    -> 9;
+
+            // ----- 10: other (stack manipulation + control) -----
+            case Opcodes.NOP,
+                 Opcodes.POP, Opcodes.POP2,
+                 Opcodes.DUP, Opcodes.DUP_X1, Opcodes.DUP_X2,
+                 Opcodes.DUP2, Opcodes.DUP2_X1, Opcodes.DUP2_X2,
+                 Opcodes.SWAP
+                    -> 10;
+
+            // Default: any reserved opcode (BREAKPOINT=202, IMPDEP1=254,
+            // IMPDEP2=255, etc.) → "other".
+            default -> 10;
+        };
     }
 }
